@@ -1,47 +1,63 @@
 from binance import AsyncClient, BinanceSocketManager
 from data.access import get_default
 from binance.client import Client
+from json import dumps, loads
+from threading import Thread
+from time import time, sleep
 from requests import post
-from json import loads
-import pandas as pd
+import numpy as np
 import asyncio
 
 
-url = 'http://127.0.0.1:8000/api'
+url = 'http://127.0.0.1:5000/api'
 default = get_default()
 period = 30
 
-
-def market_stream_formatter(stream_json: dict) -> dict:
-    stream_json = stream_json['data']['k']
-    symbol = stream_json['s']
-
-    klines_json = loads(post(url+'/get/klines', json=dict(symbol=symbol)).text)
-    if klines_json == None:
+def get_klines(socket):
+        symbol, interval = socket.replace('kline_', '').split('@')        
+        symbol = symbol.upper()
         klines_json = Client().futures_klines(symbol=symbol,
-                                              interval=stream_json['i'],
+                                              interval=interval,
                                               limit=period)
-        klines_df = pd.DataFrame(klines_json)[[0, 1, 2, 3, 4, 5]]
-        klines_df.columns = ['start', 'open', 'high', 'low', 'close', 'volume']
 
+
+        post('http://127.0.0.1:5000/api/set/klines', json=dict(symbol=socket, klines=klines_json))
+
+
+def first_start():
+    sockets = loads(post(url+'/get/default', json=dict(type="sockets")).text)
+    
+    threads = list()
+    total = 0
+    length = len(sockets)
+    i = 0
+    start = time()
+    for socket in sockets:
+        i+=1
+        
+        threads.append(Thread(target=get_klines, args=(socket,)))
+        threads[-1].start()
+
+        if i % 41 == 0:
+            sleep(12)
+
+        print(f'process:{i}/{length}\ntotal time:{time()-start}')
+
+    for thread in threads:
+        thread.join()
+
+def market_stream_formatter(stream: dict) -> dict:
+    kline =  stream['data']['k']
+    kline = np.array(list(kline.values()))[[0,6,8,9,7,10,1,13,11,14,15,16]].tolist()
+    
+    if stream['data']['k']['x']:
+        close=True
     else:
-        klines_df = pd.DataFrame(klines_json)
+        close=False
 
-    # Transform json to dataframe
-    stream_df = pd.DataFrame([stream_json])[
-        ['t', 'o', 'h', 'l', 'c', 'v']]
-    stream_df.columns = ['start', 'open', 'high', 'low', 'close', 'volume']
+    stream = stream['stream']
 
-    # if candlestick closed
-    if stream_json['x'] == True:
-        klines_df = pd.concat(
-            [klines_df.iloc[1:], stream_df], ignore_index=True)
-    else:
-        klines_df = pd.concat(
-            [klines_df.iloc[:-1], stream_df], ignore_index=True)
-
-    post(url+'/set/klines', json=dict(symbol=symbol, klines=klines_df.to_json()))
-
+    post(url+'/append/klines', json=dict(stream=stream, kline=kline, close=close))
 
 async def market_stream():
     async_client = AsyncClient(**default['account'])
@@ -51,11 +67,12 @@ async def market_stream():
     async with ts as tscm:
         while True:
             msg = await tscm.recv()
-            market_stream_formatter(msg)
+            Thread(target=market_stream_formatter, args=(msg,)).start()
 
     await async_client.close_connection()
 
 
 if __name__ == '__main__':
+    first_start()
     loop = asyncio.get_event_loop()
     loop.run_until_complete(market_stream())

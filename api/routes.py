@@ -6,6 +6,7 @@ import pandas as pd
 
 app: MyFlask
 
+
 @app.route('/api/get/config', methods=["POST"])
 def get_config_api():
     return dumps(app.my_config)
@@ -39,7 +40,7 @@ def get_klines():
     """
     data = loads(request.data)
     try:
-        return app.klines[data['symbol']].to_json()
+        return dumps(app.klines[data['symbol']])
     except KeyError:
         return dumps(None)
 
@@ -55,9 +56,32 @@ def set_klines():
 
     data = loads(request.data)
 
-    app.klines[data['symbol']] = pd.DataFrame(loads(data['klines']))
+    app.klines[data['symbol']] = data['klines']
 
-    return dumps(data['klines'])
+    return {'type': 'success'}
+
+
+@app.route('/api/append/klines', methods=["POST"])
+def append_klines():
+    """
+    request.data = {
+        "stream":"btcusdt@kline_1m",
+        "kline":['1662829680000','1718.63000000','1718.93000000','1719.27000000','1718.62000000','58.51460000','1662829739999','100586.36347000','129','25.85010000','44433.34490700','0'],
+        "close":bool
+    }
+    """
+    data = loads(request.data)
+    
+    try:
+        if data['close']:
+            app.klines[data['stream']].pop(0)
+            app.klines[data['stream']].append(data['kline'])
+        else:
+            app.klines[data['stream']][-1] = data['kline']
+    except KeyError:
+        pass
+
+    return {'type': 'success'}
 
 
 @app.route('/api/get/account', methods=["POST"])

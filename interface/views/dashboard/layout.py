@@ -3,40 +3,32 @@ from data.access import get_default
 from dash import html, dcc
 
 
-
-start_button = html.Button('Start', id='start',
-                           n_clicks=0, className='btn btn-success')
-stop_button = html.Button('Stop', id='stop',
-                          n_clicks=0, className='btn btn-danger button')
-
-button_output = html.Div(id='button_output')
-poisitons_output = html.Div(id='positions_output', className="table")
-balance_output = html.Div(id='balance_output', className="table")
 chart_output = html.Div(id='chart_output')
 
-coinlist=get_default()['sockets']
+coinlist = get_default()['sockets']
 
-chart_dropdown = dcc.Dropdown(["BTCUSDT", "ETHUSDT", "ENJUSDT", "DOGEUSDT"],
-                              id="chart_dropdown")
+coin_dict = dict()
+for coin in coinlist:
+    try:
+        coin_dict[coin.split('@')[0].upper()] = None
+    except:
+        pass
+
+coinlist = list(coin_dict)
+
+symbol_dropdown = dcc.Dropdown(coinlist, id="symbol_dropdown")
+interval_dropdown = dcc.Dropdown(["1m", "3m", "5m", "15m"], id="interval_dropdown")
+
+dropdowns = html.Div([symbol_dropdown, interval_dropdown], className="dropdowns")
 
 layout = html.Div([
 
     dcc.Interval(id='interval-component',
-                 interval=1*500,  # in milliseconds (10sec)
+                 interval=1000,  # in milliseconds (5 seconds)
                  n_intervals=0
                  ),
-
-
-    # start_button, stop_button,
-    # button_output,
-
-    # poisitons_output,
-
-    # balance_output,
-
-    chart_dropdown,
+    dropdowns,
     chart_output
-
 ],
 
     className="col text-center header-center")
