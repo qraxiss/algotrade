@@ -6,7 +6,7 @@ from json import loads, dumps
 from requests import post
 import asyncio
 
-url = "http://127.0.0.1:5000/api"
+url = "http://127.0.0.1:8000/api"
 default = get_default()
 
 client = Client(**default['account'])
