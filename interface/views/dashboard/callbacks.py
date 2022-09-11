@@ -11,7 +11,7 @@ import pandas as pd
 import pandas_ta as ta
 
 
-url = 'http://127.0.0.1:5000/api'
+url = 'http://127.0.0.1:8000/api'
 
 
 def init_callbacks(dash_app):
