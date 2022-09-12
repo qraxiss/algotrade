@@ -2,7 +2,7 @@ from interface.views.dashboard.figures import create_chart
 from interface.controllers import is_plot
 from dash import Input, Output, dcc
 
-url = 'http://127.0.0.1:5000/api'
+url = 'http://127.0.0.1:80/api'
 
 
 def init_callbacks(dash_app):

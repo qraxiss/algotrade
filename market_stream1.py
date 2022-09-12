@@ -9,7 +9,7 @@ import numpy as np
 import asyncio
 
 
-url = 'http://127.0.0.1:5000/api'
+url = 'http://127.0.0.1:80/api'
 default = get_default()
 period = 30
 sockets = default['sockets'][:20]
@@ -22,7 +22,7 @@ def get_klines(socket):
                                           interval=interval,
                                           limit=period)
 
-    post('http://127.0.0.1:5000/api/set/klines',
+    post('http://127.0.0.1:80/api/set/klines',
          json=dict(symbol=socket, klines=klines_json))
 
 
