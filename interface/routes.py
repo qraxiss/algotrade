@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from requests import post
 from json import loads
 
-url = 'http://127.0.0.1:8000/api'
+url = 'http://127.0.0.1:5000/api'
 
 with open('interface/templates/dash_raw.html', 'r') as file:
     dash_index = file.read()
