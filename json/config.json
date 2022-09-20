@@ -1,0 +1,7 @@
+{
+    "position_percentage": 30,
+    "max_position": 5,
+    "take_profit": 1,
+    "stop_loss": 2,
+    "leverage": 4
+}
