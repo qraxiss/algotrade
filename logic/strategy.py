@@ -1,5 +1,5 @@
 from binance.helpers import round_step_size
-from helpers import socket_parser
+from helpers import socket_parser, telegram_message
 from data.access import get_vwap
 from statistics import stdev
 from api import request
@@ -10,13 +10,14 @@ import requests
 
 
 class Strategy:
-    def __init__(self, values: dict, pair: dict, config: dict) -> None:
+    def __init__(self, values: dict, pair: dict, config: dict, default: dict) -> None:
         self.vwap_df = pd.DataFrame(get_vwap())
+        self.default = default
         self.values = values
         self.config = config
         self.pair = pair
 
-        self.is_liq, self.is_rsi, self.is_vwap = False, False, False
+        self.is_liq, self.is_rsi, self.is_vwap = None, "Not Calculated", "Not Calculated"
 
         # coin glass
         symbol = socket_parser(pair)[0].replace('USDT', '')
@@ -34,11 +35,14 @@ class Strategy:
         if self.rsi[-1] < self.values['rsi_long_level']:
             self.is_rsi = 'BUY'
 
-        if self.rsi[-1] > self.values['rsi_short_level']:
+        elif self.rsi[-1] > self.values['rsi_short_level']:
             self.is_rsi = 'SELL'
+        else:
+            self.is_rsi = 'No signal'
 
 
 # Liqudation
+
 
     def check_liq(self):
         self.calc_liq()
@@ -70,7 +74,7 @@ class Strategy:
 # Vwap
     def calc_vwap(self):
         self.vwap = ta.vwap(high=self.klines[2], low=self.klines[3],
-                            close=self.klines[4], volume=self.klines[5], 
+                            close=self.klines[4], volume=self.klines[5],
                             anchor="min", length=self.values['vwap_period'])
         self.vwap_upper = self.vwap * 1-(self.long/100)
         self.vwap_short = self.vwap * 1+(self.long/100)
@@ -81,10 +85,11 @@ class Strategy:
             self.is_vwap = 'BUY'
         elif self.vwap_short[-1] > self.klines[4].iloc[-1]:
             self.is_vwap = 'SELL'
+        else:
+            self.is_vwap = 'No signal'
 
 
 # Methods
-
 
     def change(self, key, value):
         self.values[key] = value
@@ -100,14 +105,15 @@ class Strategy:
             self.check_rsi()
             self.check_vwap()
 
-            if self.is_vwap == self.is_rsi:
-                request('/order', 'post', json=dict(
-                    pair=self.pair,
-                    stop_loss=self.config['stop_loss'],
-                    take_profit=self.config['take_profit'],
-                    price=self.klines[4][-1],
-                    side=self.is_rsi
-                ))
+            if self.is_rsi != None:
+                if self.is_vwap == self.is_rsi:
+                    request('/order', 'post', json=dict(
+                        pair=self.pair,
+                        stop_loss=self.config['stop_loss'],
+                        take_profit=self.config['take_profit'],
+                        price=self.klines[4][-1],
+                        side=self.is_rsi
+                    ))
 
-        else:
-            request('/balance', 'get')
+        signal_info = f'pair: {self.pair}\nliquidation: {self.is_liq}\nvwap: {self.is_vwap}\nrsi: {self.is_rsi}'
+        telegram_message(self.default['telegram'], signal_info)
