@@ -19,7 +19,8 @@ class Klines(BaseApi):
         try:
             self.resources.klines[pair] = self.data
             self.resources.strategy[pair] = Strategy(
-                values=self.resources.values, pair=pair, config=self.resources.config)
+                values=self.resources.values, pair=pair, 
+                config=self.resources.config, default=self.resources.default)
             self.json['outcome'] = True
         except Exception as err:
             self.json['err'] = err_return(str(type(err)))
