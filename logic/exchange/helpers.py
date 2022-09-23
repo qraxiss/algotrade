@@ -23,5 +23,20 @@ def get_balance(client):
 
 def cancel_levels(client, pair, positions):
     symbol, interval = socket_parser(pair)
-    order_list = positions[pair]['stop_id'], positions[pair]['take_id']
-    Thread(target=client.futures_cancel_orders, kwargs=dict(symbol=symbol, orderIdList=order_list)).start()
+    try:
+        client.futures_cancel_order(symbol=symbol, orderId=positions[pair]['take_id'])
+    except:
+        pass    
+
+    try:
+        client.futures_cancel_order(symbol=symbol, orderId=positions[pair]['stop_id'])
+    except:
+        pass
+
+def change_margin_config(client, symbol, leverage, margin_type):
+    Thread(target=client.futures_change_leverage,
+            kwargs=dict(symbol=symbol,
+                        leverage=leverage)).start()
+    Thread(target=client.futures_change_margin_type,
+            kwargs=dict(symbol=symbol,
+                        marginType=margin_type)).start()

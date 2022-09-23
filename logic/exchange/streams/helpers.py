@@ -41,12 +41,14 @@ def order_update(order: dict):
                 df = pd.DataFrame(positions).T
                 pair = find_order_by_id(order['ot'], order['i'], df)
                 if pair != None:
-                    request('/klines', 'delete', value=pair)
-
+                    request('/positions', 'delete', json=dict(pair=pair))
+                    telegram_text = f'closed :{pair}\nmarket :{order["ot"]}'
+                    request('/telegram', json=dict(text=telegram_text))
 
 def account_update(account: dict):
     account = account['a']
+    # if float(account['B'][0]['bc']) != 0:
     balance = dict(total=float(account['B'][0]['wb']),
-                   available=float(account['B'][0]['cw']))
+                available=float(account['B'][0]['cw']))
     request('/balance', 'put', json=balance)
     

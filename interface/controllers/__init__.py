@@ -1,15 +1,13 @@
-from requests import post
-from json import loads
+from api import request
 
 url = 'http://127.0.0.1:80/api'
 
 def is_plot(symbol, interval):
     if symbol != None and interval != None:
-            socket = symbol.lower() + '@kline_' + interval
+            socket = '/' + symbol.lower() + '@kline_' + interval
 
-            data = loads(post(url+'/get/klines', json=dict(symbol=socket)).text)
-            if data != None:
+            data = request('/klines', 'get', value=socket, json=dict(limit=30))
+            if data['outcome']:
                 return data
-            
             else:
                 return False

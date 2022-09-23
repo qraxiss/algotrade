@@ -32,11 +32,12 @@ class Strategy:
 
     def check_rsi(self):
         self.calc_rsi()
-        if self.rsi[-1] < self.values['rsi_long_level']:
+        if self.values['rsi_long_level'] < self.rsi[-1]:
+            self.is_rsi = 'SELL'
+
+        elif self.values['rsi_short_level'] > self.rsi[-1]:
             self.is_rsi = 'BUY'
 
-        elif self.rsi[-1] > self.values['rsi_short_level']:
-            self.is_rsi = 'SELL'
         else:
             self.is_rsi = 'No signal'
 
@@ -82,12 +83,19 @@ class Strategy:
     def check_vwap(self):
         self.calc_vwap()
         if self.vwap_upper[-1] < self.klines[4].iloc[-1]:
-            self.is_vwap = 'BUY'
-        elif self.vwap_short[-1] > self.klines[4].iloc[-1]:
             self.is_vwap = 'SELL'
+        elif self.vwap_short[-1] > self.klines[4].iloc[-1]:
+            self.is_vwap = 'BUY'
         else:
             self.is_vwap = 'No signal'
 
+
+# Candle
+    def check_candle(self):
+        if self.klines[4].iloc[-1] > self.klines[1].iloc[-1]:
+            self.is_candle = "SELL"
+        elif self.klines[4].iloc[-1] < self.klines[1].iloc[-1]:
+            self.is_candle = "BUY"
 
 # Methods
 
@@ -104,6 +112,7 @@ class Strategy:
         if self.is_liq:
             self.check_rsi()
             self.check_vwap()
+            # self.check_candle()
 
             if self.is_rsi != None:
                 if self.is_vwap == self.is_rsi:
@@ -116,4 +125,4 @@ class Strategy:
                     ))
 
         signal_info = f'pair: {self.pair}\nliquidation: {self.is_liq}\nvwap: {self.is_vwap}\nrsi: {self.is_rsi}'
-        telegram_message(self.default['telegram'], signal_info)
+        request('/telegram', 'post', json=dict(text=signal_info))

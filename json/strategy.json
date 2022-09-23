@@ -1,8 +1,1 @@
-{
-    "rsi_period":7,
-    "rsi_long_level":70,
-    "rsi_short_level":30,
-    "vwap_sensitivity_long":1.2,
-    "vwap_sensitivity_short":1.2,
-    "vwap_period":6
-}
+{"rsi_period": -1, "rsi_long_level": 55, "rsi_short_level": 30, "vwap_sensitivity_long": 3.04, "vwap_sensitivity_short": 5, "vwap_period": 8}

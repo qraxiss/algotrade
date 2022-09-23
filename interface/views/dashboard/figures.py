@@ -24,7 +24,7 @@ def create_chart(symbol, interval, data, vwap_long, vwap_short, rsi_l_, vwap_l_)
 
     vwap_long, vwap_short, rsi_l_, vwap_l_ = func_values
 
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(data['data'])
     df[[0, 1, 2, 3, 4, 5]] = df[[0, 1, 2, 3, 4, 5]].astype('float')
     df[0] = pd.to_datetime(df[0], unit='ms')
     df.index = df[0]

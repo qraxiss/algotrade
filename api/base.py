@@ -14,12 +14,13 @@ class ApiResources:
     config = get_config()
     values = get_values()
 
+    run = config['run']
+
     client = Client(**default['account'])
     websocket = WebSocket(client, default['account'])
 
     step_info = get_step_info(client)
     balance = get_balance(client)
-
 
 
 class BaseApi(Resource):
@@ -31,3 +32,5 @@ class BaseApi(Resource):
             self.data = None
         self.json = {}
         self.resources = ApiResources()
+        31
+        31

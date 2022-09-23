@@ -3,7 +3,7 @@
 }
 
 div{
-    margin-bottom: 20px;
+    margin-bottom: 5px;
 }
 
 .form-control {
@@ -41,6 +41,7 @@ div{
 .dropdowns{
     display: flex;
     flex-direction: row;
+    justify-content: center;
 }
 
 #symbol_dropdown{
@@ -49,4 +50,30 @@ div{
 
 #interval_dropdown{
     width: 15%;
+}
+
+#socket_symbol_dropdown{
+    width: 15%;
+}
+
+#socket_interval_dropdown{
+    width: 15%;
+}
+
+.append-delete{
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.input-group{
+    justify-content: center;
+}
+
+.inputs{
+    display: flex;
+    flex-direction: column;
+    width: 25%;
+    margin-left: auto;
+    margin-right: auto;
 }

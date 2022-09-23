@@ -30,9 +30,13 @@ class WebSocket:
         ts = bm.futures_multiplex_socket(streams=[socket])
         self.sockets[socket] = True
         async with ts as tscm:
-            while self.sockets[socket]:
-                res = await tscm.recv()
-                kline_update(res)
+            try:
+                while self.sockets[socket]:
+                    res = await tscm.recv()
+                    kline_update(res)
+            except:
+                pass
+
         await async_client.close_connection()
 
     def kline(self, **kwargs):
@@ -47,6 +51,7 @@ class WebSocket:
     def kline_close(self, socket: str):
         if self.sockets[socket]:
             self.sockets[socket] = False
+            del self.sockets[socket]
 
     async def user_async(self, account):
         async_client = await binance.AsyncClient.create(**account)
@@ -76,3 +81,7 @@ class WebSocket:
     def user_close(self):
         if self.sockets['user']:
             self.sockets['user'] = False
+
+
+    def get_sockets(self):
+        return list(self.sockets)

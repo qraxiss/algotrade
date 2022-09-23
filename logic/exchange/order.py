@@ -1,38 +1,44 @@
 from binance.helpers import round_step_size
+from helpers import err_return
 from threading import Thread
 from api import request
+
+from binance.client import Client
+from json import dumps
 
 
 class Order:
     def __init__(self, params, resources) -> None:
-        self.step_info = resources.step_info
-        self.positions = resources.positions
-        self.balance = resources.balance
-        self.default = resources.default
-        self.client = resources.client
-        self.config = resources.config
-        self.params = params
-        self.orders = None
-        self.order = None
+        if resources.run:
+            self.step_info = resources.step_info
+            self.positions = resources.positions
+            self.balance = resources.balance
+            self.default = resources.default
+            self.client: Client = resources.client
+            self.config = resources.config
+            self.success = False
+            self.params = params
+            self.orders = None
+            self.order = None
 
-        self.side = self.params['side']
-        self.pair = self.params['pair']
-        self.symbol = self.params['pair'].split('@')[0].upper()
-        self.mode_params = self.default['mode_params']['BOTH']
-        # so as not to calculate in vain if the trade order is not valid.
-        self.order = self.is_order_valid()
-        if self.order != False:
-            # prepare params for the order
-            self.levels()
-            self.quantity()
-            self.round()
-            self.common_params = dict(
-                symbol=self.symbol, quantity=str(self.params['quantity']))
+            self.side = self.params['side']
+            self.pair = self.params['pair']
+            self.symbol = self.params['pair'].split('@')[0].upper()
+            self.mode_params = self.default['mode_params']['HEDGE']
+            # so as not to calculate in vain if the trade order is not valid.
+            self.order = self.is_order_valid()
+            if self.order != False:
+                # prepare params for the order
+                self.levels()
+                self.quantity()
+                self.round()
+                self.common_params = dict(
+                    symbol=self.symbol, quantity=str(self.params['quantity']))
 
-            if self.order == 'new':
-                self.new_order()
-            elif self.order == 'close':
-                self.close_order()
+                if self.order == 'new':
+                    self.new_order()
+                elif self.order == 'close':
+                    self.close_order()
 
     def is_order_valid(self):
         if self.params['pair'] not in self.positions:
@@ -75,46 +81,68 @@ class Order:
 
     def new_order(self):
 
-        sl_params = dict(**self.mode_params[f'{self.side}_STOP_LOSS'],
-                         stopPrice=self.params['stop_loss'])
-        tp_params = dict(**self.mode_params[f'{self.side}_TAKE_PROFIT'],
-                         stopPrice=self.params['take_profit'])
+        self.sl_params = dict(**self.mode_params[f'{self.side}_STOP_LOSS'],
+                              stopPrice=str(self.params['stop_loss']),
+                              **self.common_params)
+        self.tp_params = dict(**self.mode_params[f'{self.side}_TAKE_PROFIT'],
+                              stopPrice=str(self.params['take_profit']),
+                              **self.common_params)
         position_params = dict(**self.mode_params[f'{self.side}'])
 
-        self.levels_ = [dict(**self.common_params, **sl_params),
-                        dict(**self.common_params, **tp_params)]
+        self.stops = [self.sl_params, self.tp_params]
 
         self.orders = self.client.futures_place_batch_order(
-            batchOrders=self.levels_)
+            batchOrders=self.stops)
 
         # check orders succesfuly opens
-        self.success = False
+        self.telegram_text = ""
         if 'code' in self.orders[0] and 'code' in self.orders[1]:
-            pass
+            self.telegram_text += f'sl_err: {self.orders[0]["msg"]}'
+            self.telegram_text += f'tp_err: {self.orders[1]["msg"]}'
         elif 'code' not in self.orders[0] and 'code' in self.orders[1]:
-            pass
-
+            self.telegram_text += f'tp_err: {self.orders[1]["msg"]}'
+            self.client.futures_cancel_order(
+                symbol=self.symbol, orderId=self.orders[0]['orderId'])
         elif 'code' in self.orders[0] and 'code' not in self.orders[1]:
-            pass
-
+            self.telegram_text += f'sl_err: {self.orders[0]["msg"]}'
+            self.client.futures_cancel_order(
+                symbol=self.symbol, orderId=self.orders[1]['orderId'])
         else:
             try:
-                self.client.futures_create_order(**position_params)
+                self.position = self.client.futures_create_order(
+                    **position_params, **self.common_params)
             except Exception as err:
-                pass
+                self.telegram_text = f'position_err: {err_return(str(type(err)))}'
+                self.client.futures_cancel_all_open_orders(symbol=self.symbol)
+            else:
+                self.success = True
+                self.telegram_text = f'pair:{self.pair}\nprice:{self.params["price"]}\nside:{self.side}'
+
+        request('/telegram', 'post', json=dict(text=self.telegram_text))
 
     def close_order(self):
         close_params = self.mode_params[f'{self.side}_CLOSE']
         self.orders = dict(close_order=self.client.futures_create_order(
             **self.common_params, **close_params))
+        try:
+            self.client.futures_cancel_order(
+                symbol=self.symbol, orderId=self.positions[self.pair]['take_id'])
+            self.client.futures_cancel_order(
+                symbol=self.symbol, orderId=self.positions[self.pair]['stop_id'])
+        except Exception as err:
+            self.telegram_text = f'cancel_err: {err_return(str(type(err)))}'
+        else:
+            self.success = True
+            self.telegram_text = f'closed: {self.pair}\n market: MARKET'
+        
+        request('/telegram', 'post', json=dict(text=self.telegram_text))
 
-        order_list = self.positions[self.pair]['take_id'], self.positions[self.pair]['stop_id']
 
 class OrderManagement(Order):
     def __init__(self, params, resources) -> None:
         super().__init__(params, resources)
 
-        if self.orders != None:
+        if self.success:
             if self.order == 'new':
                 self.put_order()
 
@@ -125,23 +153,17 @@ class OrderManagement(Order):
         position = dict(
             side=self.side,
             price=self.params['price'],
-            quantity=self.quantity,
-            id=self.orders['new_order']['orderId'],
-            positionSide=self.orders['new_order']['positionSide'],
-            levels=dict(
-                stop=dict(
-                    id=self.orders['stop_order']['orderId'],
-                    price=self.orders['stop_order']['stopPrice']
-                ),
-                take=dict(
-                    id=self.orders['take_order']['orderId'],
-                    price=self.orders['take_order']['stopPrice']
-                )
-            )
+            quantity=self.params['quantity'],
+            id=self.position['orderId'],
+            positionSide=self.position['positionSide'],
+            stop_id=self.orders[0]['orderId'],
+            stop_price=self.orders[0]['stopPrice'],
+            take_id=self.orders[1]['orderId'],
+            take_price=self.orders[1]['stopPrice']
         )
 
-        Thread(target=request, kwargs=dict(api='/positions',
-               method='put', json=dict(pair=self.pair, position=position))).start()
+        json = dict(pair=self.pair, position=position)
+        request(api='/positions', method='put', json=json)
 
     def delete_order(self):
         position_data = dict(

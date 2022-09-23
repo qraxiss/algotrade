@@ -24,6 +24,6 @@ def get_values():
     with open("json/strategy.json", 'r') as file:
         return load(file)
 
-def set_config(overwrite_json)->None:
+def set_values(overwrite_json)->None:
     with open("json/strategy.json", 'w') as file:
         dump(overwrite_json, file)

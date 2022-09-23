@@ -1,8 +1,7 @@
-from logic import OrderManagement, Strategy, cancel_levels
-from data.access import set_config
-from helpers import err_return
+from logic import OrderManagement, Strategy, cancel_levels, change_margin_config
+from helpers import err_return, send_telegram_messages, socket_parser
+from data.access import set_config, set_values
 from api.base import BaseApi
-import asyncio
 
 
 class Klines(BaseApi):
@@ -19,7 +18,7 @@ class Klines(BaseApi):
         try:
             self.resources.klines[pair] = self.data
             self.resources.strategy[pair] = Strategy(
-                values=self.resources.values, pair=pair, 
+                values=self.resources.values, pair=pair,
                 config=self.resources.config, default=self.resources.default)
             self.json['outcome'] = True
         except Exception as err:
@@ -56,10 +55,13 @@ class Klines(BaseApi):
         return self.json
 
 
-class Config(BaseApi):
+class Strategy(BaseApi):
     def get(self):
         try:
-            self.json['data'] = self.resources.config
+            if self.data == None:
+                self.json['data'] = self.resources.values
+            else:
+                self.json['data'] = self.resources.values[self.data['key']]
             self.json['outcome'] = True
         except Exception as err:
             self.json['err'] = err_return(str(type(err)))
@@ -69,13 +71,34 @@ class Config(BaseApi):
 
     def put(self):
         try:
-            path = ""
-            value = self.data['value']
+            self.resources.values[self.data['key']] = self.data['value']
+            set_values(self.resources.values)
 
-            for key in self.data['keys']:
-                path += f'["{key}"]'
+            self.json['outcome'] = True
+        except Exception as err:
+            self.json['err'] = err_return(str(type(err)))
+            self.json['outcome'] = False
 
-            exec(f'self.resources.my_config{path}={value}')
+        return self.json
+
+
+class Config(BaseApi):
+    def get(self):
+        try:
+            if self.data == None:
+                self.json['data'] = self.resources.config
+            else:
+                self.json['data'] = self.resources.config[self.data['key']]
+            self.json['outcome'] = True
+        except Exception as err:
+            self.json['err'] = err_return(str(type(err)))
+            self.json['outcome'] = False
+
+        return self.json
+
+    def put(self):
+        try:
+            self.resources.config[self.data['key']] = self.data['value']
             set_config(self.resources.config)
 
             self.json['outcome'] = True
@@ -182,6 +205,17 @@ class WebsocketManage(BaseApi):
         return self.json
 
 
+    def get(self):
+        try:
+            self.json['data'] = self.resources.websocket.get_sockets()
+            self.json['outcome'] = True
+        except Exception as err:
+            self.json['err'] = err_return(str(type(err)))
+            self.json['outcome'] = False
+
+        return self.json
+
+
 class UserSocketManage(BaseApi):
     def post(self):
         try:
@@ -205,5 +239,38 @@ class UserSocketManage(BaseApi):
         return self.json
 
 
-class StrategyApi(BaseApi):
-    pass
+class Telegram(BaseApi):
+    def post(self):
+        try:
+            send_telegram_messages(
+                self.resources.default['telegram'], self.data['text'])
+            self.json['outcome'] = True
+        except Exception as err:
+            self.json['err'] = err_return(str(type(err)))
+            self.json['outcome'] = False
+
+
+class MarginConfig(BaseApi):
+    def put(self):
+        if 'symbol' in self.data:
+            change_margin_config(self.resources.client,
+                                 self.data['symbol'],
+                                 self.data['leverage'],
+                                 self.data['margin_type'])
+        else:
+            for kline in self.resources.klines:
+                symbol, interval = socket_parser(kline)
+                change_margin_config(self.resources.client,
+                                     symbol,
+                                     self.data['leverage'],
+                                     self.data['margin_type'])
+
+
+class OnOff(BaseApi):
+    def put(self):
+        try:
+            self.resources.run = self.data['run']
+            self.json['outcome'] = True
+        except Exception as err:
+            self.json['err'] = err_return(str(type(err)))
+            self.json['outcome'] = False
